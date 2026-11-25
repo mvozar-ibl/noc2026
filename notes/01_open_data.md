@@ -45,6 +45,8 @@ So climatology is the best constant forecast on the training hours. Section 4 re
 
 ## 4. The best straight line
 
+**The problem, stated exactly.** The model is the line $\hat y = w\,x + b$. Its loss on the $N$ training hours is $L(w, b) = \frac1N\sum(w\,x + b - y)^2$, and the best line is the pair $(w^*, b^*)$ with the smallest loss of all pairs: $L(w^*, b^*) \le L(w, b)$ for every $w$ and $b$. The stars mark the best values; without a star, $w$ and $b$ are any values. Below: how to read the solution, how to derive it, why it really is the lowest point, and what it guarantees.
+
 **How to read the formula.** The bar means "average over the training hours", and $x - \bar x$, $y - \bar y$ are the **deviations** from the average, now and $h$ hours later. The numerator, the **covariance**, is large when the two deviations tend to have the same sign: a wind stronger than usual now stays stronger than usual later. The denominator, the **variance**, is the typical squared size of the deviation now. Their ratio $w$ is the share of the present deviation still there $h$ hours later: $w = 1$ keeps all of it (persistence), $w = 0$ forgets all of it (climatology). Then $b$ makes the line pass through the average point $(\bar x, \bar y)$.
 
 **Deriving least squares.** At the lowest point of the loss its slope is zero in every direction: $\partial L/\partial b = 0$ and $\partial L/\partial w = 0$ ($\partial$ reads "the slope of $L$ when only this one parameter changes").
@@ -59,9 +61,42 @@ $$\frac{dL}{dw} = \frac2N\sum\Big(w\,(x - \bar x) - (y - \bar y)\Big)(x - \bar x
 
 gives the formula for $w$. The function `best_line` is exactly these two results.
 
+*Both at once: the normal equations.* Written out, the two conditions are two linear equations in $w$ and $b$:
+
+$$\begin{pmatrix}\overline{x^2} & \bar x \cr \bar x & 1\end{pmatrix}\begin{pmatrix}w \cr b\end{pmatrix} = \begin{pmatrix}\overline{x\,y} \cr \bar y\end{pmatrix}.$$
+
+They have exactly one solution when the determinant, $\overline{x^2} - \bar x^2 = \overline{(x - \bar x)^2}$, the variance of $x$, is not zero: unless the input never changes. Notebook 2 meets this matrix again, doubled, as the Hessian, the matrix of the second derivatives of the loss, and the notes to notebook 2 (section 6) give the same equations for many inputs.
+
+**Why this is the lowest point.** A zero slope alone also holds at a top or a saddle. Here it is the lowest point, and the only one. Write $e^* = w^* x + b^* - y$ for the errors of the best line; the two conditions say $\overline{e^*} = 0$ and $\overline{e^* x} = 0$. Any other line has the errors $w x + b - y = e^* + d$, with $d = (w - w^*)\,x + (b - b^*)$. Then
+
+$$L(w, b) = \overline{(e^* + d)^2} = \overline{e^{*2}} + 2\,\overline{e^* d} + \overline{d^2} = L(w^*, b^*) + \overline{d^2},$$
+
+because $\overline{e^* d} = (w - w^*)\,\overline{e^* x} + (b - b^*)\,\overline{e^*} = 0$. As $\overline{d^2} \ge 0$, no line has a smaller loss, and only $(w^*, b^*)$ itself has the same loss, as soon as $x$ takes two different values.
+
+**What the best line guarantees.** Four facts follow from the two conditions:
+
+1. it passes through the average point $(\bar x, \bar y)$;
+2. its errors average to zero, $\overline{\hat y - y} = 0$: it is too high as often, and by as much, as it is too low;
+3. its errors are uncorrelated with the input, $\overline{(\hat y - y)(x - \bar x)} = 0$: no line in $x$ can explain what is left of the error, so a better forecast needs other inputs;
+4. with $\rho$ the correlation of $x$ and $y$, and $\sigma_x$, $\sigma_y$ their spreads, $w^* = \rho\,\sigma_y/\sigma_x$ and the smallest loss is $L(w^*, b^*) = \sigma_y^2\,(1 - \rho^2)$.
+
+Fact 4 is the formula for $w^*$ with the covariance written as $\rho\,\sigma_x\sigma_y$; putting it into the error of step 2 gives the loss $w^{*2}\sigma_x^2 - 2w^*\rho\,\sigma_x\sigma_y + \sigma_y^2 = \sigma_y^2(1 - \rho^2)$. A check on the 6-hour line of the notebook, on its 2023 training hours:
+
+```python
+error = w * x + b - y  # the errors of the best line on its training hours (2023, 6 h ahead)
+rho_xy = np.corrcoef(x, y)[0, 1]
+print(f"1. at the average x the line gives {w * x.mean() + b:.4f}, the average y is {y.mean():.4f}")
+print(f"2. average error {error.mean():+.1e} m/s")
+print(f"3. average of error times (x - mean x): {np.mean(error * (x - x.mean())):+.1e}")
+print(f"4. w = {w:.4f}, rho std(y) / std(x) = {rho_xy * y.std() / x.std():.4f}; "
+      f"loss {np.mean(error**2):.4f}, var(y) (1 - rho^2) = {y.var() * (1 - rho_xy**2):.4f}")
+```
+
+All four hold: at the average speed the line gives 3.2084 m/s, the average of $y$; the two averages of the errors are about $10^{-7}$, zero up to the rounding of the 32-bit numbers in the data; and $w = 0.6151$ and the loss, 1.8036 m²/s², agree with fact 4.
+
 **Why the line flattens.** Over a year, $x$ and $y$ are the same series shifted by $h$ hours, so they have nearly the same spread, and $w$ is then the **correlation** between the wind now and $h$ hours later. The further ahead, the weaker the link, so the forecast is pulled towards the average: *regression towards the mean*.
 
-**Why it cannot lose to the baselines on the training data.** Persistence and climatology are lines too, $(w, b) = (1, 0)$ and $(0, \bar y)$. The best line has the smallest loss of all lines, so its loss is at most theirs. On new data, 2024, this is not guaranteed, but it holds when the years are alike, as the plot shows.
+**Why it cannot lose to the baselines on the training data.** Persistence and climatology are lines too, $(w, b) = (1, 0)$ and $(0, \bar y)$. The best line has the smallest loss of all lines (shown above), so its loss is at most theirs. On new data, 2024, this is not guaranteed, but it holds when the years are alike, as the plot shows.
 
 **Three forecasts, one number: the autocorrelation.** The correlation between the speed now and the speed $h$ hours later is the **autocorrelation** $\rho$: the correlation of the wind with itself, $h$ hours apart. As $x$ and $y$ have about the same average $\bar y$ and the same spread $\sigma$ (the standard deviation), the best line's weight is $w = \rho$ and its forecast is $\hat y = \bar y + \rho\,(x - \bar y)$. Write each error with the deviations $x - \bar y$ and $y - \bar y$ and average its square: the average of a squared deviation is $\sigma^2$, and that of the product of the two deviations is $\rho\,\sigma^2$. The mean squared errors of the three forecasts are then
 
@@ -103,7 +138,43 @@ for name, f in [("persistence", persistence), ("best line", line)]:
 
 It prints a correlation of 1.0000, and a best match 6 hours earlier for both. In the week of the notebook even the daily rise and fall of the speed, which the clock alone could foresee, arrives 6 hours late: the hour of the day is not among the line's inputs.
 
-**The best line is not the best linear model.** It is the best line with *one input*, the speed now. Linear models with more inputs, fitted by the same least squares, can do better. Fitted on 2023 and scored on 2024, 6 hours ahead, for the wind speed at the grid point of notebooks 2 and 3 (notebook 1's numbers agree to rounding):
+**The best line is not the best linear model.** It is the best line with *one input*, the speed now. Linear models with more inputs, fitted by the same least squares, can do better. Fitted on 2023 and scored on 2024, 6 hours ahead, for the wind speed at the grid point of notebooks 2 and 3 (notebook 1's numbers agree to rounding). The hour of the day enters in two ways: as a sine and a cosine of the hour, for each of the 6 hours, or as 24 categories, 23 inputs of 0 or 1 for the hour now (the 24th is the bias).
+
+```python
+from windlab import least_squares, make_samples, patch
+
+time_p, u_p, v_p = fetch_wind(*patch(48.15, 17.11), "2020-01-01", "2024-12-31", cache="data/bratislava_patch_2020-2024.npz")
+u_p, v_p = u_p.astype(float), v_p.astype(float)
+speed_p, centre = np.hypot(u_p, v_p), 4  # the 3 x 3 patch; its centre is the grid point of notebooks 2 and 3
+target = speed_p[:, centre]
+hour_p = time_p.astype(int) % 24
+sine_cosine = np.c_[np.sin(2 * np.pi * hour_p / 24), np.cos(2 * np.pi * hour_p / 24)]
+field9 = np.load("data/bratislava_field9_2023-2024.npz")  # the 9 x 9 field, 2023-2024
+u9, v9, start9 = field9["u"].astype(float), field9["v"].astype(float), len(time_p) - len(field9["time"])
+
+def linear_model(inputs, lags, hours=time_p, truth=target, categories=False, fit_year=2023):
+    # Least squares 6 h ahead, fitted on fit_year and scored on 2024
+    X, Y, t = make_samples(inputs, truth, lags, 6)
+    if categories:  # the hour of the day at hour t, as 23 inputs of 0 or 1
+        X = np.c_[X, (hours[t].astype(int) % 24)[:, None] == np.arange(1, 24)]
+    fit_rows, score_rows = year(hours[t]) == fit_year, year(hours[t]) == 2024
+    W, b_fit = least_squares(X[fit_rows], Y[fit_rows])
+    forecast, truth_2024 = (X[score_rows] @ W + b_fit)[:, 0], Y[score_rows][:, 0]
+    error, error_persistence = rmse(forecast, truth_2024), rmse(truth[t[score_rows]], truth_2024)
+    match = [np.corrcoef(forecast[k:], truth_2024[:len(truth_2024) - k])[0, 1] for k in range(13)]
+    return (f"{X.shape[1]:3d} inputs, RMSE {error:.3f} (persistence {error_persistence:.3f}), "
+            f"skill {1 - (error / error_persistence) ** 2:+.3f}, best match {np.argmax(match)} h earlier")
+
+one_point = np.c_[target, u_p[:, centre], v_p[:, centre]]
+print("best line:                    ", linear_model(target, 1))
+print("speed, last 6 h:              ", linear_model(target, 6))
+print("speed, u, v, last 6 h:        ", linear_model(one_point, 6))
+print("  + hour as sine and cosine:  ", linear_model(np.c_[one_point, sine_cosine], 6))
+print("  + hour as 24 categories:    ", linear_model(one_point, 6, categories=True))
+print("3 x 3 field, last 6 h:        ", linear_model(np.c_[speed_p, u_p, v_p], 6))
+print("9 x 9 field, last 3 h:        ", linear_model(np.c_[np.hypot(u9, v9), u9, v9], 3, hours=field9["time"], truth=target[start9:]))
+print("best line fitted on 2024 (cheating):", linear_model(target, 1, fit_year=2024))
+```
 
 | Linear model | Inputs | RMSE (m/s) | Skill | Best match with the truth |
 | --- | --- | --- | --- | --- |
@@ -111,11 +182,12 @@ It prints a correlation of 1.0000, and a best match 6 hours earlier for both. In
 | best line: the speed now | 1 | 1.303 | +0.154 | 6 h earlier |
 | the speed, the last 6 hours | 6 | 1.293 | +0.167 | 6 h earlier |
 | the speed, u and v, the last 6 hours | 18 | 1.303 | +0.154 | 6 h earlier |
-| the same, and the hour of the day | 30 | 1.260 | +0.209 | 6 h earlier |
+| the same, and the hour of the day as a sine and a cosine | 30 | 1.260 | +0.209 | 6 h earlier |
+| the same, and the hour of the day as 24 categories | 41 | 1.249 | +0.223 | 6 h earlier |
 | the 3 × 3 field (speed, u, v), the last 6 hours | 162 | 1.237 | +0.238 | 5 h earlier |
 | the 9 × 9 field (speed, u, v), the last 3 hours | 729 | 1.200 | +0.282 | 5 h earlier |
 
-A line fitted on 2024 itself, which is cheating, gains only 0.006 m/s (1.297 instead of 1.303): within its own family, the best line is as good as it gets. More history at one point barely helps. The hour of the day does, because the speed has a daily cycle. And only the wind around the point, which arrives later, makes the forecast earlier.
+A line fitted on 2024 itself, which is cheating, gains only 0.006 m/s (1.297 instead of 1.303): within its own family, the best line is as good as it gets. More history at one point barely helps. The hour of the day does, because the speed has a daily cycle, and more as 24 categories, which can follow any shape of the cycle, than as one sine and cosine. And only the wind around the point, which arrives later, makes the forecast earlier.
 
 **The daily cycle in the climatology.** The right panel of section 2 is a climatology of its own: the average speed for each hour of the day. The daily cycle also shows in the autocorrelation, which does not simply fall: around 48 hours it rises again, because the target is once more at the same hour of the day as now. The cycle can be moved into the climatology. Forecast the 2023 average $c$ of the target's hour of the day, and let a line work only on the **anomaly**, the deviation of the speed from the average of its hour:
 
@@ -137,9 +209,11 @@ w_anomaly, b_anomaly = best_line(anomaly[train_hours[:-h]], anomaly[train_hours[
 forecast = c[hour_of_day[test_hours[:-h] + h]] + w_anomaly * anomaly[test_hours[:-h]] + b_anomaly
 print(f"6 h: best line {rmse(w * x_test + b, y_test):.3f} m/s, the hour's average + a line on the anomaly "
       f"{rmse(forecast, speed[test_hours[:-h] + h]):.3f} m/s")
+print(f"persistence: largest RMSE {rmse_persistence.max():.3f} m/s at {horizons[np.argmax(rmse_persistence)]} h, "
+      f"{rmse_persistence[-1]:.3f} m/s at 48 h")
 ```
 
-At this grid point the daily cycle is weak, so one average for each hour of the day gains little over one average for all hours: 1.743 instead of 1.768 m/s. But the anomaly's autocorrelation keeps falling where the speed's rises again: 0.158, 0.133 and 0.128 at 36, 42 and 48 hours, against 0.132, 0.128 and 0.153. And 6 hours ahead, the hour's average plus a line on the anomaly scores 1.249 m/s: better than the best line (1.303), and better than every single-point model in the table above, with 2 parameters and 24 averages. A climatology for what the clock foresees and a fading memory for the rest: this split is a common baseline in forecasting, known as damped persistence of the anomaly.
+At this grid point the daily cycle is weak, so one average for each hour of the day gains little over one average for all hours: 1.743 instead of 1.768 m/s. But the anomaly's autocorrelation keeps falling where the speed's rises again: 0.158, 0.133 and 0.128 at 36, 42 and 48 hours, against 0.132, 0.128 and 0.153. The same ripple shows in persistence, whose error is $2\sigma^2(1 - \rho)$: it peaks at 39 hours (2.340 m/s) and is a little smaller at 48 hours (2.295 m/s), when the hour of the day matches again. And 6 hours ahead, the hour's average plus a line on the anomaly scores 1.249 m/s: better than the best line (1.303), and as good as the 41-input linear model of the table with the hour as 24 categories, with only 2 parameters and 24 averages. A climatology for what the clock foresees and a fading memory for the rest: this split is a common baseline in forecasting, known as damped persistence of the anomaly.
 
 ## More exercises
 

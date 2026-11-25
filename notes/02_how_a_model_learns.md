@@ -12,6 +12,8 @@ The names of notebook 1 stay (see its notes): input $x$, target $y$, forecast $\
 | loss | $L$ | `loss` | the mean squared error on the training hours: smaller is better |
 | gradient | $\partial L/\partial w$, $\partial L/\partial b$ | `dw`, `db` | for each parameter, how fast the loss grows when that parameter grows |
 | learning rate | $\eta$ ("eta") | `lr` | the size of one step against the gradient |
+| curvature | $\kappa$ ("kappa") | `kappa` | how sharply the loss bends along one direction: the second derivative along it |
+| Hessian | $H$ | `H` | the matrix of all second derivatives of the loss; its eigenvalues are the curvatures $\kappa$ along the bowl's main axes |
 | batch | | `batch_size` | the samples used for one step |
 | epoch | | `epochs` | one pass over all training samples |
 
@@ -48,27 +50,28 @@ The loss is the average over the $N$ hours, and the slope of an average is the a
 
 $$\theta - \theta^* \;\leftarrow\; (1 - \eta\kappa)\,(\theta - \theta^*).$$
 
-The distance to the bottom shrinks only if $|1 - \eta\kappa| < 1$, that is $\eta < 2/\kappa$; a larger step jumps over the valley, lands higher on the other side, and the walk blows up. Our loss is such a bowl in two dimensions. Its curvatures along the steepest and the flattest direction are the eigenvalues of the matrix of second slopes, $2\begin{pmatrix}\overline{x^2} & \bar x \cr \bar x & 1\end{pmatrix}$:
+The distance to the bottom shrinks only if $|1 - \eta\kappa| < 1$, that is $\eta < 2/\kappa$; a larger step jumps over the valley, lands higher on the other side, and the walk blows up. Our loss is such a bowl in two dimensions.
+
+**From $\kappa$ to the Hessian.** With two parameters there are four second derivatives, $\partial^2 L/\partial w^2$, $\partial^2 L/\partial w\,\partial b$, $\partial^2 L/\partial b\,\partial w$ and $\partial^2 L/\partial b^2$. Differentiating the gradient of the notebook once more gives them, and they form the **Hessian** $H = 2\begin{pmatrix}\overline{x^2} & \bar x \cr \bar x & 1\end{pmatrix}$. Its diagonal holds the curvature along $w$ alone and along $b$ alone. Along any direction, a unit vector $d$, the loss is a one-parameter bowl with curvature $d^\top H\,d$; this is largest and smallest along the two eigenvectors of $H$, the main axes of the bowl, where it equals the eigenvalues. Those eigenvalues are the curvatures $\kappa$ of the steepest and the flattest direction:
 
 ```python
-second_slopes = 2 * np.array([[np.mean(x * x), np.mean(x)], [np.mean(x), 1.0]])
-kappa = np.linalg.eigvalsh(second_slopes)  # the two curvatures, flattest first
+kappa = np.linalg.eigvalsh(H)  # the two curvatures, flattest first (H from the notebook)
 print(f"curvatures {kappa[0]:.2f} and {kappa[1]:.2f}: stable for lr < {2 / kappa[1]:.3f}; "
       f"with lr = {lr} the flat direction shrinks by {1 - lr * kappa[0]:.3f} per step")
 ```
 
-The curvatures are 1.85 and 11.72, so gradient descent is stable for $\eta < 0.171$: `lr = 0.2` blows up. With $\eta = 0.05$ the distance along the flat direction shrinks by the factor 0.907 per step, which is why the walk creeps at the end.
+The diagonal of $H$ is 11.57 and 2: u is several metres per second, so $\overline{x^2}$ is several times larger than 1, and that is what makes the bowl long and thin. The curvatures are 1.85 and 11.72, so gradient descent is stable for $\eta < 0.171$: `lr = 0.2` blows up. With $\eta = 0.05$ the distance along the flat direction shrinks by the factor 0.907 per step, which is why the walk creeps at the end.
 
 **One step: Newton, and a rescaled input.**
 
-- *Newton lands in one step.* The loss of a line is exactly a quadratic bowl around its lowest point $\theta^*$, $L(\theta) = L(\theta^*) + \tfrac12(\theta - \theta^*)^\top H\,(\theta - \theta^*)$, with $H$ the matrix of second slopes above. Its gradient is therefore $\nabla L(\theta) = H\,(\theta - \theta^*)$, so $\theta - H^{-1}\nabla L(\theta) = \theta^*$ from any start. This is the normal equations of section 6, solved in one step.
+- *Newton lands in one step.* The loss of a line is exactly a quadratic bowl around its lowest point $\theta^*$, $L(\theta) = L(\theta^*) + \tfrac12(\theta - \theta^*)^\top H\,(\theta - \theta^*)$, with $H$ the Hessian above. Its gradient is therefore $\nabla L(\theta) = H\,(\theta - \theta^*)$, so $\theta - H^{-1}\nabla L(\theta) = \theta^*$ from any start. This is the normal equations of section 6, solved in one step.
 - *A rescaled input needs only a plain step.* For $\tilde x = (x - \bar x)/\sigma_x$, the average of $\tilde x$ is 0 and that of $\tilde x^2$ is 1, so $H = 2\begin{pmatrix}1 & 0 \cr 0 & 1\end{pmatrix}$: both curvatures are 2, and $\eta = 1/2$ makes both factors $1 - \eta\kappa$ zero.
 - *Back to the original units.* From $\hat y = \tilde w\,\tilde x + \tilde b$ follow $w = \tilde w/\sigma_x$ and $b = \tilde b - \tilde w\,\bar x/\sigma_x$.
 
 On the raw bowl, no single step size does both directions at once:
 
 ```python
-kappa = np.linalg.eigvalsh(2 * np.array([[np.mean(x * x), np.mean(x)], [np.mean(x), 1.0]]))
+kappa = np.linalg.eigvalsh(H)
 for eta in (1 / kappa[1], 1 / kappa[0]):
     print(f"lr = {eta:.3f}: per step the flat direction keeps {1 - eta * kappa[0]:+.2f}, the steep one {1 - eta * kappa[1]:+.2f}")
 ```
@@ -143,25 +146,56 @@ for seed in range(20):
 print("SGD, 20 batch orders:", "  ".join(f"{name} {m:.3f} ± {s:.3f}" for name, m, s in zip(data, np.mean(ends, 0), np.std(ends, 0))))
 ```
 
-On average SGD scores 0.533 ± 0.003 on 2023, 0.500 ± 0.004 on 2024 and 0.396 ± 0.003 in Košice, against 0.530, 0.497 and 0.395 for gradient descent: slightly worse everywhere, so the gain in Košice was luck. The scatter of SGD, about ±0.004 m/s, is far smaller than the difference between the two years, 0.033 m/s: precision beyond the noise of the data buys nothing. With 2 parameters and 8,760 hours there is nothing to overfit, and the optimizer changes the cost, not what the line learns.
+On average SGD scores 0.533 ± 0.003 on 2023, 0.500 ± 0.004 on 2024 and 0.396 ± 0.003 in Košice, against 0.530, 0.497 and 0.395 for gradient descent: slightly worse everywhere, so the gain in Košice was luck. SGD's end point jitters around the bottom and costs about 0.003 m/s on every data set, whichever batches it draws. With 2 parameters and 8,760 hours there is nothing to overfit: for this line, the optimizer changes the cost, not what is learned.
 
-**And for the network?** The same comparison for the delta network of section 5, trained with full batches (gradient descent) for the same 350 steps as the notebook's batches of 1,024:
+**And for the network?** The same comparison for the delta network of section 5, trained with full batches (gradient descent) for the same 350 steps as the notebook's batches of 1,024, three random starts each:
 
 ```python
-gd_delta, _ = train_mlp(Y_ba[train] - now_ba[train], epochs=350, batch_size=int(train.sum()))
-print(f"full batch: Bratislava 2024 {rmse(now_ba[test] + predict(gd_delta, X_ba[test]), Y_ba[test]):.3f}, "
-      f"Kosice {rmse(now_ke + predict(gd_delta, X_ke), Y_ke):.3f}")
+import time as clock  # "time" already holds the hours of the data
+for name, epochs, size in [("batches of 1,024", 10, 1024), ("full batches", 350, int(train.sum()))]:
+    scores, start = [], clock.perf_counter()
+    for seed in range(3):
+        model, _ = train_mlp(Y_ba[train] - now_ba[train], epochs=epochs, batch_size=size, seed=seed)
+        scores.append((rmse(now_ba[test] + predict(model, X_ba[test]), Y_ba[test]), rmse(now_ke + predict(model, X_ke), Y_ke)))
+    scores = np.array(scores)
+    print(f"{name}: Bratislava 2024 {scores[:, 0].min():.3f}-{scores[:, 0].max():.3f}, "
+          f"Kosice {scores[:, 1].min():.3f}-{scores[:, 1].max():.3f}; {(clock.perf_counter() - start) / 3:.1f} s per run")
 ```
 
-Full batches score 1.484 in Bratislava 2024 and 1.217 in Košice, against 1.492 and 1.209 with batches, and take several times longer. The closer fit to Bratislava costs a little in Košice. A test outside the notebook, with three random starts each and with plain SGD, gradient descent and AdamW, showed the same pattern: the closer a model fits the training town, the slightly worse it does in the new one, whichever optimizer got it there. With plain SGD, full batches and batches of 1,024 even ended up equal for the same number of steps.
+With batches of 1,024 the three runs score 1.492–1.493 in Bratislava 2024 and 1.209–1.216 in Košice; with full batches 1.481–1.484 and 1.217–1.224, at about ten times the time per run on the test laptop. For every random start, the full batches fit Bratislava a little closer and do a little worse in Košice: for a network, the optimizer can change what is learned, if only slightly.
 
 **AdamW, line by line.**
 
 - *Momentum.* Unrolled, $m_k = (1-\beta_1)\left(g_k + \beta_1 g_{k-1} + \beta_1^2 g_{k-2} + \dots\right)$: recent gradients count most, roughly the last $1/(1-\beta_1) = 10$. Random errors partly cancel, while a steady direction adds up.
 - *The typical size.* $s$ is the same kind of average of $g^2$, over roughly the last $1/(1-\beta_2) = 1{,}000$ steps, so $\sqrt{s}$ is the typical size of each parameter's gradient.
 - *The correction of the start.* $m$ and $s$ start at 0. If every gradient were the same $g$, the geometric series gives $m_k = (1-\beta_1)(1 + \beta_1 + \dots + \beta_1^{k-1})\,g = (1 - \beta_1^k)\,g$, so dividing $m$ by $1 - \beta_1^k$ returns exactly $g$; likewise for $s$ with $\beta_2$.
-- *The step.* If a parameter's gradient keeps its sign, the corrected $m$ is about $g$ and the corrected $\sqrt{s}$ about $|g|$, so the parameter moves by about $\eta$ per step, however large or small its gradient is; $\epsilon = 10^{-8}$ only prevents a division by zero. That pays off in networks, where the gradients of different weights differ by orders of magnitude; on our line it makes $b$ wander off first.
-- *Weight decay.* $-\eta\lambda\,\theta$ shrinks every parameter by the fraction $\eta\lambda$ per step, keeping weights small unless the data need them. It is "decoupled", the W in AdamW: applied directly to $\theta$, not through the gradient, so the division by $\sqrt{s}$ does not weaken it.
+- *The step.* If a parameter's gradient keeps its sign, the corrected $m$ is about $g$ and the corrected $\sqrt{s}$ about $|g|$, so the parameter moves by about $\eta$ per step, however large or small its gradient is; $\epsilon = 10^{-8}$ only prevents a division by zero. That pays off in networks, where the gradients of different weights differ by orders of magnitude. On our line it does not: $w$ has to travel 0.97 and $b$ only 0.016, but both move by about $\eta$ per step, so $b$ overshoots and needs many steps to settle. That is why AdamW is the slowest of the three in the notebook.
+- *Weight decay.* $-\eta\lambda\,\theta$ shrinks every parameter by the fraction $\eta\lambda$ per step, keeping weights small unless the data need them. A network with many weights can use large ones to follow the noise of its training data (**overfitting**), and the pull towards zero makes that costly. On the line, with 2 parameters, it only shifts $w$ and $b$ a little. It is "decoupled", the W in AdamW: applied directly to $\theta$, not through the gradient, so the division by $\sqrt{s}$ does not weaken it.
+
+**Is AdamW worse, then?** Not where it is meant to work. Its step does not depend on the size of the gradient, so one learning rate suits problems of any scale, while SGD's learning rate must be tuned to each problem: on the line, `lr = 0.2` blows SGD up (the limit is 0.171, section 1) but not AdamW (exercise 3 of the notebook). The networks of section 5 show the same thing. Trained with plain SGD, they match AdamW only after the learning rate has been tuned:
+
+```python
+def train_sgd(target, lr, epochs=10, batch_size=1024, seed=0):
+    # As train_mlp, with plain SGD instead of AdamW
+    torch.manual_seed(seed)
+    model = mlp(X_ba[train], n_out=2)
+    opt = torch.optim.SGD(model.parameters(), lr=lr)
+    fit(model, X_ba[train], target, opt, epochs=epochs, batch_size=batch_size,
+        scheduler=warmup_cosine(opt, epochs * math.ceil(train.sum() / batch_size)), seed=seed)
+    return model
+
+def skill(forecast):  # against persistence, Bratislava 2024
+    return 1 - (rmse(forecast, Y_ba[test]) / rmse(now_ba[test], Y_ba[test])) ** 2
+
+for lr in (0.01, 0.1, 0.3):
+    absolute_sgd, delta_sgd = train_sgd(Y_ba[train], lr), train_sgd(Y_ba[train] - now_ba[train], lr)
+    print(f"SGD, lr = {lr}: skill absolute {skill(predict(absolute_sgd, X_ba[test])):+.3f}, "
+          f"delta {skill(now_ba[test] + predict(delta_sgd, X_ba[test])):+.3f}")
+print(f"AdamW, lr = 0.002 (the notebook): skill absolute {skill(predict(absolute, X_ba[test])):+.3f}, "
+      f"delta {skill(now_ba[test] + predict(delta, X_ba[test])):+.3f}")
+```
+
+With `lr = 0.01`, SGD's absolute network does not even reach persistence (skill −0.030); with `lr = 0.3` it scores +0.198 and +0.192, as good as AdamW's +0.179 and +0.191 at the notebook's learning rate. Tuned, plain SGD does as well on this small network. AdamW's advantage is that it needs no such search, and that is what makes it the usual choice for networks.
 
 ## 3. Autodiff
 
@@ -189,7 +223,7 @@ which `curve_gradient` computes.
 
 **Why there is no formula.** For the line, $w$ and $b$ appeared only multiplied by data and added, so the zero-slope conditions were linear equations, which algebra solves. Here $\tau$ sits inside 48 exponentials, and $dL/d\tau = 0$ can only be solved numerically.
 
-**Why a learning rate of 500, and why it is safe.** The right step depends on how steep the loss is in the units of the parameter: about 0.02 per hour of $\tau$ here, about 10 in section 1. Near the bottom the loss curve is a parabola, so the rule of section 1 applies, $\eta < 2/\kappa$:
+**Why a learning rate of 500, and why it is safe.** The right step depends on how sharply the loss bends in the units of the parameter: near the bottom, the curvature in $\tau$ is about $4 \times 10^{-4}$ per hour² (the check below), against 1.85 to 11.72 for the line of section 1, so the stable learning rate is thousands of times larger. Near the bottom the loss curve is a parabola, so the rule of section 1 applies, $\eta < 2/\kappa$:
 
 ```python
 kappa_tau = (curve_loss(tau + 1e-3) - 2 * curve_loss(tau) + curve_loss(tau - 1e-3)) / 1e-3**2
@@ -239,9 +273,9 @@ print(f"steepest / flattest curvature: the line of section 1 {curvature_ratio(x[
       f"raw {curvature_ratio(X_train):,.0f}, rescaled {curvature_ratio((X_train - X_train.mean(0)) / X_train.std(0)):,.0f}")
 ```
 
-The line of section 1 has a ratio of 6.3. The 12 inputs have 1,762 raw and 1,847 rescaled: u and v are both in m/s with similar spreads, so rescaling changes almost nothing here, and the bowl is about 300 times more elongated than the one gradient descent crept along in section 1. Rescaling matters when the inputs come in different units and sizes, a pressure in pascals next to a wind in m/s. To make the bowl of correlated inputs round, they would have to be decorrelated as well ("whitening"), with the matrix of their correlations: second-order information again.
+The line of section 1 has a ratio of 6.3. The 12 inputs have 1,762 raw and 1,847 rescaled: u and v are both in m/s with similar spreads, so rescaling changes almost nothing here, and the ratio is about 300 times that of the bowl gradient descent crept along in section 1. Rescaling matters when the inputs come in different units and sizes, a pressure in pascals next to a wind in m/s. To make the bowl of correlated inputs round, they would have to be decorrelated as well ("whitening"), with the matrix of their correlations: second-order information again.
 
-**Why the delta form starts well.** At the start $f(x;\theta) \approx 0$, so $\hat y \approx$ the wind now: training starts from the loss of persistence and only has to learn corrections. With little data, or in a new town, that safe start matters most.
+**Why the delta form starts well.** At the start $f(x;\theta) \approx 0$, so $\hat y \approx$ the wind now: training starts from the loss of persistence and only has to learn corrections. The absolute network needs about two epochs just to reach that loss (the plot of section 5); after that, the start no longer matters much on the training town. The safe start matters most when training is short, for example with little data.
 
 **The schedule.** With batches of 1,024 hours, one epoch is 35 steps. For the first 5 % of the steps the learning rate rises linearly from almost 0, while AdamW's averages are still rough; then it falls as $\eta \cdot \tfrac12\left(1 + \cos \pi p\right)$, with $p$ going from 0 to 1, so the jitter of section 2 dies out at the end.
 
@@ -257,7 +291,21 @@ For a single input they are the two equations of notebook 1. `windlab.least_squa
 
 - *Sudden changes stay late.* Every forecast turns after the truth has turned, and the error of every model grows with the size of the change: six hours of wind at one place do not announce a front.
 - *The network beats the line only slightly.* With these 12 inputs most of what is predictable is linear; more parameters cannot add information that the inputs do not contain.
-- *A new town costs skill.* The networks learned Bratislava's habits. The delta network keeps more of its skill in Košice than the absolute one, because it starts from persistence, which works everywhere.
+- *A new town costs skill.* The models learned Bratislava's habits. The plain linear model, with 26 parameters, learned the fewest of them and keeps the most skill in Košice. With the notebook's 12 inputs, the delta network keeps more than the absolute one for every random start below: a learned correction to persistence seems to carry over better than a forecast learned from scratch. But that is an observation for these inputs, not a rule. With the whole 3 × 3 field as input (`FIELD = True`, exercise 6), both networks fall below persistence in Košice, and the delta form is no longer reliably the better one:
+
+```python
+for FIELD in (False, True):  # samples() reads FIELD
+    X_ba, Y_ba, now_ba, t_ba = samples(u, v)
+    X_ke, Y_ke, now_ke, _ = samples(u_ke, v_ke)
+    for seed in range(3):
+        absolute_s, _ = train_mlp(Y_ba[train], seed=seed)
+        delta_s, _ = train_mlp(Y_ba[train] - now_ba[train], seed=seed)
+        skills = [1 - (rmse(forecast, Y_ke) / rmse(now_ke, Y_ke)) ** 2
+                  for forecast in (predict(absolute_s, X_ke), now_ke + predict(delta_s, X_ke))]
+        print(f"FIELD = {FIELD}, seed {seed}: Kosice skill absolute {skills[0]:+.3f}, delta {skills[1]:+.3f}")
+```
+
+With the notebook's inputs the delta network wins in Košice for all three starts (+0.073 to +0.083, against +0.044 to +0.054). With the whole field, all six runs fall below persistence there, and the delta form is worse in two of the three starts.
 
 ## More exercises
 
@@ -267,3 +315,4 @@ For a single input they are the two equations of notebook 1. `windlab.least_squa
 4. Section 5: train both networks with `epochs=20`. Does the absolute network catch up? What did the delta form buy, then?
 5. Section 5: train with full batches, as above, and compare Bratislava and Košice.
 6. **Zero-shot:** keep `HORIZON = 6`, train only on Bratislava, and raise the skill in Košice. With `FIELD = True` the networks get better in Bratislava but worse in Košice: why?
+7. Section 2: set `lr = 0.2` (notebook exercise 3), then try AdamW with `lr = 0.01` and `lr = 0.5`. How far can AdamW's learning rate move before its walk gets worse, and SGD's?

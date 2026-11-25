@@ -9,7 +9,7 @@
 Students in years 2–3 of a bachelor's or year 1 of a master's degree who program in Python. Typical fields are informatics, robotics and electrical engineering. No machine learning, no meteorology and no GPU are needed: every model is built up from a straight line.
 
 - **Required:** basic Python, and knowing how to run a Jupyter cell.
-- **Helpful:** numpy, and what a derivative is.
+- **Helpful:** numpy; derivatives and partial derivatives (the chain rule); the inverse of a 2 × 2 matrix; what a correlation is.
 
 ## Learning outcomes
 

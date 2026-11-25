@@ -110,13 +110,17 @@ def least_squares(X, Y):
 
 
 class Standardize(nn.Module):
-    """(x - mean) / std with statistics fixed from the training inputs."""
+    """(x - mean) / std with statistics fixed from the training inputs, taken over the axes `dims`.
 
-    def __init__(self, x):
+    The default, dims=(0,), gives every input its own mean and std. For a map (samples, channels, rows, columns),
+    dims=(0, 2, 3) gives one mean and std per channel, shared by all grid points.
+    """
+
+    def __init__(self, x, dims=(0,)):
         super().__init__()
         x = torch.as_tensor(x, dtype=torch.float32)
-        self.register_buffer("mean", x.mean(0))
-        self.register_buffer("std", x.std(0))
+        self.register_buffer("mean", x.mean(dim=dims, keepdim=True)[0])
+        self.register_buffer("std", x.std(dim=dims, keepdim=True)[0])
 
     def forward(self, x):
         return (x - self.mean) / self.std

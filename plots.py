@@ -59,7 +59,9 @@ def plot_rmse_by_horizon(horizons, curves, climatology):
 
 def plot_best_lines(pairs, best_line, label="speed"):
     """For each horizon h in `pairs` (h -> (x, y)): the data, persistence, climatology and the best line."""
-    ends = np.array([min(min(x.min(), y.min()) for x, y in pairs.values()), max(max(x.max(), y.max()) for x, y in pairs.values())])
+    low = min(min(x.min(), y.min()) for x, y in pairs.values())
+    high = max(max(x.max(), y.max()) for x, y in pairs.values())
+    ends = np.array([min(low, 0.0), high])  # a speed is never negative, so its axes start at 0
     fig, axes = plt.subplots(1, len(pairs), figsize=(13, 4.3), sharex=True, sharey=True)
     for ax, (h, (x, y)) in zip(axes, pairs.items()):
         w, b = best_line(x, y)
