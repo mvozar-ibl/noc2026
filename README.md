@@ -5,7 +5,7 @@ These are Jupyter notebooks for a one-hour workshop. You download open ERA5 wind
 | Notebook | Content | Time |
 | --- | --- | --- |
 | `01_open_data.ipynb` | one Open-Meteo request; u, v and the speed; persistence, climatology and the best straight line by formula, for the wind speed; forecasts against the truth | 20 min (fast track 15) |
-| `02_sgd_to_adamw.ipynb` | the same line by gradient descent, SGD and AdamW written by hand, compared on new data; PyTorch autodiff; a curve without a formula, the wind's memory time; the same loop trains a small MLP in the delta form; its limits, and a zero-shot test in Košice | 20 min (fast track 15) |
+| `02_sgd_to_adamw.ipynb` | a line like notebook 1's (for the eastward wind u) by gradient descent, SGD and AdamW written by hand, compared on new data; PyTorch autodiff; a curve without a formula, the wind's memory time; the same loop trains a small MLP in the delta form; its limits, and a zero-shot test in Košice | 20 min (fast track 15) |
 | `03_bonus_cnn.ipynb` | bonus: the same loop trains a small CNN on a 9 × 9 wind field | fast track only: 12 min |
 
 The notebooks hold what is done live: a few sentences, the key formula and the code of every step. The reasons and derivations behind every step are in `notes/`, one file per notebook, to read at home. The syllabus explains the two tracks: the standard one runs notebooks 1 and 2, and the fast track, for a quick group, also fits notebook 3 into the hour.

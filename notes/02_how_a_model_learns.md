@@ -169,7 +169,7 @@ With batches of 1,024 the three runs score 1.492–1.493 in Bratislava 2024 and 
 - *Momentum.* Unrolled, $m_k = (1-\beta_1)\left(g_k + \beta_1 g_{k-1} + \beta_1^2 g_{k-2} + \dots\right)$: recent gradients count most, roughly the last $1/(1-\beta_1) = 10$. Random errors partly cancel, while a steady direction adds up.
 - *The typical size.* $s$ is the same kind of average of $g^2$, over roughly the last $1/(1-\beta_2) = 1{,}000$ steps, so $\sqrt{s}$ is the typical size of each parameter's gradient.
 - *The correction of the start.* $m$ and $s$ start at 0. If every gradient were the same $g$, the geometric series gives $m_k = (1-\beta_1)(1 + \beta_1 + \dots + \beta_1^{k-1})\,g = (1 - \beta_1^k)\,g$, so dividing $m$ by $1 - \beta_1^k$ returns exactly $g$; likewise for $s$ with $\beta_2$.
-- *The step.* If a parameter's gradient keeps its sign, the corrected $m$ is about $g$ and the corrected $\sqrt{s}$ about $|g|$, so the parameter moves by about $\eta$ per step, however large or small its gradient is; $\epsilon = 10^{-8}$ only prevents a division by zero. That pays off in networks, where the gradients of different weights differ by orders of magnitude. On our line it does not: $w$ has to travel 0.97 and $b$ only 0.016, but both move by about $\eta$ per step, so $b$ overshoots and needs many steps to settle. That is why AdamW is the slowest of the three in the notebook.
+- *The step.* If a parameter's gradient keeps its sign, the corrected $m$ is about $g$ and the corrected $\sqrt{s}$ about $|g|$, so the parameter moves by about $\eta$ per step, however large or small its gradient is; $\epsilon = 10^{-8}$ only prevents a division by zero. That pays off in networks, where the gradients of different weights differ by orders of magnitude. On our line it does not: $w$ has to travel 0.97 and $b$ only 0.016, but both move by about $\eta$ per step, so $b$ overshoots and needs many steps to settle. That is why AdamW is the slowest of the three per step in the notebook; per hour of data read it still beats gradient descent.
 - *Weight decay.* $-\eta\lambda\,\theta$ shrinks every parameter by the fraction $\eta\lambda$ per step, keeping weights small unless the data need them. A network with many weights can use large ones to follow the noise of its training data (**overfitting**), and the pull towards zero makes that costly. On the line, with 2 parameters, it only shifts $w$ and $b$ a little. It is "decoupled", the W in AdamW: applied directly to $\theta$, not through the gradient, so the division by $\sqrt{s}$ does not weaken it.
 
 **Is AdamW worse, then?** Not where it is meant to work. Its step does not depend on the size of the gradient, so one learning rate suits problems of any scale, while SGD's learning rate must be tuned to each problem: on the line, `lr = 0.2` blows SGD up (the limit is 0.171, section 1) but not AdamW (exercise 3 of the notebook). The networks of section 5 show the same thing. Trained with plain SGD, they match AdamW only after the learning rate has been tuned:
@@ -223,6 +223,15 @@ which `curve_gradient` computes.
 
 **Why there is no formula.** For the line, $w$ and $b$ appeared only multiplied by data and added, so the zero-slope conditions were linear equations, which algebra solves. Here $\tau$ sits inside 48 exponentials, and $dL/d\tau = 0$ can only be solved numerically.
 
+Logarithms seem to give a formula after all. All 48 weights are positive, and if $w_h = e^{-h/\tau}$, then $\ln w_h = -h/\tau$: a line through the origin, whose least-squares slope gives $1/\tau = -\sum h \ln w_h / \sum h^2$. But that answers a different question. It minimizes the errors in $\ln w$, not in $w$, and since $\ln w$ changes by $\Delta w / w$, it weighs the small weights of the long horizons far more than our loss does:
+
+```python
+print(f"smallest weight {w_h.min():.3f}; tau from the logarithms {-np.sum(horizons**2) / np.sum(horizons * np.log(w_h)):.2f} h, "
+      f"gradient descent on L {tau:.2f} h")
+```
+
+The logarithms give 22.15 hours, gradient descent on our loss 21.29 hours. Which is right depends on which errors matter; for the loss we chose, there is no formula.
+
 **Why a learning rate of 500, and why it is safe.** The right step depends on how sharply the loss bends in the units of the parameter: near the bottom, the curvature in $\tau$ is about $4 \times 10^{-4}$ per hour² (the check below), against 1.85 to 11.72 for the line of section 1, so the stable learning rate is thousands of times larger. Near the bottom the loss curve is a parabola, so the rule of section 1 applies, $\eta < 2/\kappa$:
 
 ```python
@@ -275,7 +284,7 @@ print(f"steepest / flattest curvature: the line of section 1 {curvature_ratio(x[
 
 The line of section 1 has a ratio of 6.3. The 12 inputs have 1,762 raw and 1,847 rescaled: u and v are both in m/s with similar spreads, so rescaling changes almost nothing here, and the ratio is about 300 times that of the bowl gradient descent crept along in section 1. Rescaling matters when the inputs come in different units and sizes, a pressure in pascals next to a wind in m/s. To make the bowl of correlated inputs round, they would have to be decorrelated as well ("whitening"), with the matrix of their correlations: second-order information again.
 
-**Why the delta form starts well.** At the start $f(x;\theta) \approx 0$, so $\hat y \approx$ the wind now: training starts from the loss of persistence and only has to learn corrections. The absolute network needs about two epochs just to reach that loss (the plot of section 5); after that, the start no longer matters much on the training town. The safe start matters most when training is short, for example with little data.
+**Why the delta form starts well.** At the start $f(x;\theta) \approx 0$, so $\hat y \approx$ the wind now: training starts from the loss of persistence and only has to learn corrections. The absolute network needs about one and a half epochs just to reach that loss (the plot of section 5); after that, the start no longer matters much on the training town. The safe start matters most when training is short, for example with little data.
 
 **The schedule.** With batches of 1,024 hours, one epoch is 35 steps. For the first 5 % of the steps the learning rate rises linearly from almost 0, while AdamW's averages are still rough; then it falls as $\eta \cdot \tfrac12\left(1 + \cos \pi p\right)$, with $p$ going from 0 to 1, so the jitter of section 2 dies out at the end.
 
@@ -289,14 +298,17 @@ For a single input they are the two equations of notebook 1. `windlab.least_squa
 
 **The limits in the plots.**
 
-- *Sudden changes stay late.* Every forecast turns after the truth has turned, and the error of every model grows with the size of the change: six hours of wind at one place do not announce a front.
+- *Sudden changes stay late.* Every forecast turns after the truth has turned, and the error of every model grows with the size of the change (for persistence by definition: the plot groups the hours by the change, which is its error): six hours of wind at one place do not announce a front.
 - *The network beats the line only slightly.* With these 12 inputs most of what is predictable is linear; more parameters cannot add information that the inputs do not contain.
-- *A new town costs skill.* The models learned Bratislava's habits. The plain linear model, with 26 parameters, learned the fewest of them and keeps the most skill in Košice. With the notebook's 12 inputs, the delta network keeps more than the absolute one for every random start below: a learned correction to persistence seems to carry over better than a forecast learned from scratch. But that is an observation for these inputs, not a rule. With the whole 3 × 3 field as input (`FIELD = True`, exercise 6), both networks fall below persistence in Košice, and the delta form is no longer reliably the better one:
+- *A new town costs skill.* The models learned Bratislava's habits. With the notebook's 12 inputs, the plain linear model keeps the most skill in Košice, and the delta network more than the absolute one, for every random start below: a learned correction to persistence seems to carry over better than a forecast learned from scratch. Both are observations for these inputs, not rules. With the whole 3 × 3 field as input (`FIELD = True`, exercise 6), every model falls below persistence in Košice, the linear one furthest, and the delta form is no longer reliably better than the absolute one:
 
 ```python
 for FIELD in (False, True):  # samples() reads FIELD
     X_ba, Y_ba, now_ba, t_ba = samples(u, v)
     X_ke, Y_ke, now_ke, _ = samples(u_ke, v_ke)
+    W_lin, b_lin = least_squares(X_ba[train], Y_ba[train])
+    print(f"FIELD = {FIELD}, {X_ba.shape[1]} inputs: Kosice skill linear "
+          f"{1 - (rmse(X_ke @ W_lin + b_lin, Y_ke) / rmse(now_ke, Y_ke)) ** 2:+.3f}")
     for seed in range(3):
         absolute_s, _ = train_mlp(Y_ba[train], seed=seed)
         delta_s, _ = train_mlp(Y_ba[train] - now_ba[train], seed=seed)
@@ -305,7 +317,28 @@ for FIELD in (False, True):  # samples() reads FIELD
         print(f"FIELD = {FIELD}, seed {seed}: Kosice skill absolute {skills[0]:+.3f}, delta {skills[1]:+.3f}")
 ```
 
-With the notebook's inputs the delta network wins in Košice for all three starts (+0.073 to +0.083, against +0.044 to +0.054). With the whole field, all six runs fall below persistence there, and the delta form is worse in two of the three starts.
+With the notebook's 12 inputs, the linear model scores +0.106 in Košice and the delta network beats the absolute one for all three starts (+0.073 to +0.083, against +0.044 to +0.054). With the whole field, all seven models fall below persistence there: the linear one to −0.504, the networks to between −0.055 and −0.129, and the delta form is worse in two of the three starts.
+
+**Why the linear model falls furthest: correlated inputs.** The 108 inputs of the field are neighbouring points and neighbouring hours, nearly copies of each other, so their bowl is extremely long and thin (section 5). Least squares then finds large weights of opposite sign whose small differences fit Bratislava; in Košice those differences no longer fit. A penalty on large weights, $\lambda \sum w^2$ added to the loss (**ridge regression**, the linear model's weight decay, section 2), keeps the weights small:
+
+```python
+x_mean, x_std = X_ba[train].mean(0), X_ba[train].std(0)  # FIELD = True, from the loop above: 108 inputs
+
+def ridge(penalty):
+    # Least squares on the rescaled inputs, with penalty * (sum of squared weights) added to the loss; the bias is free
+    A = np.c_[(X_ba[train] - x_mean) / x_std, np.ones(train.sum())]
+    free_bias = np.diag(np.r_[np.ones(A.shape[1] - 1), 0.0])
+    weights = np.linalg.solve(A.T @ A + penalty * len(A) * free_bias, A.T @ Y_ba[train])
+    return weights, lambda X: np.c_[(X - x_mean) / x_std, np.ones(len(X))] @ weights
+
+for penalty in (0.0, 0.001, 0.1):
+    weights, forecast = ridge(penalty)
+    print(f"lambda = {penalty}: sum of |weights| {np.abs(weights[:-1]).sum():.1f}; skill Bratislava 2024 "
+          f"{1 - (rmse(forecast(X_ba[test]), Y_ba[test]) / rmse(now_ba[test], Y_ba[test])) ** 2:+.3f}, "
+          f"Kosice {1 - (rmse(forecast(X_ke), Y_ke) / rmse(now_ke, Y_ke)) ** 2:+.3f}")
+```
+
+Without a penalty the weights add up to 156 (in the units of the rescaled inputs), and the model scores +0.284 in Bratislava but −0.504 in Košice. A tiny penalty, $\lambda = 0.001$, shrinks them to 56 and lifts Košice to −0.084, at almost no cost in Bratislava (+0.275); with $\lambda = 0.1$ they add up to 12, and Košice reaches +0.039, above persistence. A model that fits its training town a little less closely carries over better: that is the job of weight decay in AdamW (section 2).
 
 ## More exercises
 

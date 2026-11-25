@@ -12,7 +12,7 @@ These notes hold the background and the derivations; the workshop runs the noteb
 
 ## 2. A first look
 
-**Why midday is windiest.** The sun warms the ground, the air near the ground mixes with the faster air above, and the wind at 10 m picks up speed. At night the ground cools, the lowest air settles, and the 10 m wind slows down.
+**Why the early afternoon is windiest.** The peak is at 13 UTC, 14–15 h local time, when the ground is warmest. The sun warms the ground, the air near the ground mixes with the faster air above, and the wind at 10 m picks up speed. At night the ground cools, the lowest air settles, and the 10 m wind slows down.
 
 **Seams in the data.** The small jumps of the diurnal cycle at 9–10 and 21–22 UTC are not weather: ERA5 is computed in 12-hour pieces that start at 9 and 21 UTC, and neighbouring pieces do not join perfectly. Every dataset has such seams.
 
