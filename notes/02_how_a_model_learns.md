@@ -36,7 +36,7 @@ For the speed the curvatures are 0.41 and 27.96 (for u: 1.85 and 11.72, see sect
 
 ## 1. Gradient descent
 
-**Where the gradient comes from.** For one hour the squared error is $(\hat y - y)^2$ with $\hat y - y = w x + b - y$. By the chain rule, the slope of a square is twice the thing squared times the slope of that thing, and the slope of $w x + b - y$ is $x$ when $w$ changes and 1 when $b$ changes:
+**Where the gradient comes from.** For one hour the squared error is $(\hat y - y)^2$ with $\hat y - y = w x + b - y$. By the chain rule, the slope of a square is twice the thing inside the square, times the slope of that thing, and the slope of $w x + b - y$ is $x$ when $w$ changes and 1 when $b$ changes:
 
 $$\frac{\partial}{\partial w}\left(\hat y - y\right)^2 = 2\left(\hat y - y\right)x, \qquad \frac{\partial}{\partial b}\left(\hat y - y\right)^2 = 2\left(\hat y - y\right).$$
 
@@ -77,12 +77,28 @@ With $\eta = 1/11.72 = 0.085$ the steep direction is done in one step, but the f
 
 **First order and second order.** Gradient descent, SGD and AdamW use only the first derivatives of the loss, one slope per parameter: they are *first-order* methods. Newton's step also needs all the second derivatives, the matrix $H$: it is a *second-order* method. That is what makes it exact in one step on a bowl, and what makes it rarely feasible:
 
-- *Memory.* With $n$ parameters, $H$ has $n^2$ entries. For the 5,122 parameters of the network in section 5 that is 26 million numbers, 210 MB; for a model with a billion parameters, $10^{18}$.
-- *Time.* Solving $H\,\Delta\theta = \nabla L$ takes about $n^3/3$ operations, $4.5 \times 10^{10}$ for our network, and $H$ changes after every step, so it would have to be computed and solved again each time.
+- *Memory.* With $n$ parameters, $H$ has $n^2$ entries. For the 5,122 parameters of the network in section 5 that is 26 million numbers, 210 MB, which a laptop still holds; for a million parameters it is 8 TB, and for a billion $8 \times 10^{18}$ bytes.
+- *Time.* $H$ must first be computed: one row of second derivatives per parameter, each row at least as costly as a gradient over all the data. For our network that is at least 5,122 passes over the data, more than 500 times its whole training of 10 epochs. Solving $H\,\Delta\theta = \nabla L$ then takes about $n^3/3$ operations, $4.5 \times 10^{10}$; on the test laptop that alone takes about as long as the whole training (the check below). And $H$ changes after every step, so all this would be repeated at each one.
 - *Shape.* The loss of a line is one clean bowl, but the loss of a network is not: it has saddles and ridges, where some curvatures are negative, and there the Newton step can point uphill.
 - *Noise.* With batches, $H$ would be estimated from 64 or 1,024 samples, and inverting a noisy matrix amplifies the noise.
 
-So in practice training uses first-order methods and borrows the idea cheaply. Rescaling the inputs makes the bowl rounder before training starts (section 5). AdamW's step size per parameter is a rough relative of Newton's: it rescales each parameter's step by the typical size of its own gradient, without ever computing $H$. Quasi-Newton methods such as L-BFGS build a small approximation of $H^{-1}$ from the last few gradients; they work well for smooth problems with full batches, less so with the noisy batches of SGD.
+The time of one solve, on a matrix of the size of $H$ for our network, against the whole training of section 5:
+
+```python
+import time as clock  # "time" already holds the hours of the data
+H_network = np.eye(5122) + 0.001  # a matrix of the size of H for the network of section 5
+start = clock.perf_counter()
+np.linalg.solve(H_network, np.ones(5122))
+solve_seconds = clock.perf_counter() - start
+start = clock.perf_counter()
+train_mlp(Y_ba[train] - now_ba[train])
+print(f"H: {H_network.nbytes / 1e6:.0f} MB; one solve {solve_seconds:.1f} s; "
+      f"the whole training of section 5 {clock.perf_counter() - start:.1f} s")
+```
+
+On the test laptop one solve and the whole training each take under a second: a single Newton step costs about as much as all 350 steps of AdamW even before $H$ is computed.
+
+Where $H$ is cheap, it is used. For a linear model the loss is one fixed bowl, the Newton step is the normal equations (section 6), and `least_squares` solves them directly: for the 2 × 13 parameters of the linear forecast in section 6, and the 2 × 487 of notebook 3. So in practice networks are trained by first-order methods, which borrow the idea cheaply. Rescaling the inputs evens out their sizes before training starts (section 5, which also shows its limit). AdamW's step size per parameter is a rough relative of Newton's: it rescales each parameter's step by the typical size of its own gradient, without ever computing $H$. Quasi-Newton methods such as L-BFGS build a small approximation of $H^{-1}$ from the last few gradients; they work well for smooth problems with full batches, less so with the noisy batches of SGD.
 
 ## 2. SGD and AdamW
 
@@ -143,9 +159,9 @@ Full batches score 1.484 in Bratislava 2024 and 1.217 in Košice, against 1.492 
 
 - *Momentum.* Unrolled, $m_k = (1-\beta_1)\left(g_k + \beta_1 g_{k-1} + \beta_1^2 g_{k-2} + \dots\right)$: recent gradients count most, roughly the last $1/(1-\beta_1) = 10$. Random errors partly cancel, while a steady direction adds up.
 - *The typical size.* $s$ is the same kind of average of $g^2$, over roughly the last $1/(1-\beta_2) = 1{,}000$ steps, so $\sqrt{s}$ is the typical size of each parameter's gradient.
-- *The correction of the start.* $m$ and $s$ start at 0. If every gradient were the same $g$, the geometric series gives $m_k = (1-\beta_1)(1 + \beta_1 + \dots + \beta_1^{k-1})\,g = (1 - \beta_1^k)\,g$, so $\hat m = m/(1 - \beta_1^k)$ returns exactly $g$; likewise $\hat s = s/(1 - \beta_2^k)$.
-- *The step.* If a parameter's gradient keeps its sign, $\hat m \approx g$ and $\sqrt{\hat s} \approx |g|$, so the parameter moves by about $\eta$ per step, however large or small its gradient is; $\epsilon = 10^{-8}$ only prevents a division by zero. That pays off in networks, where the gradients of different weights differ by orders of magnitude; on our line it makes $b$ wander off first.
-- *Weight decay.* $-\eta\lambda\,\theta$ shrinks every parameter by the fraction $\eta\lambda$ per step, keeping weights small unless the data need them. It is "decoupled", the W in AdamW: applied directly to $\theta$, not through the gradient, so the division by $\sqrt{\hat s}$ does not weaken it.
+- *The correction of the start.* $m$ and $s$ start at 0. If every gradient were the same $g$, the geometric series gives $m_k = (1-\beta_1)(1 + \beta_1 + \dots + \beta_1^{k-1})\,g = (1 - \beta_1^k)\,g$, so dividing $m$ by $1 - \beta_1^k$ returns exactly $g$; likewise for $s$ with $\beta_2$.
+- *The step.* If a parameter's gradient keeps its sign, the corrected $m$ is about $g$ and the corrected $\sqrt{s}$ about $|g|$, so the parameter moves by about $\eta$ per step, however large or small its gradient is; $\epsilon = 10^{-8}$ only prevents a division by zero. That pays off in networks, where the gradients of different weights differ by orders of magnitude; on our line it makes $b$ wander off first.
+- *Weight decay.* $-\eta\lambda\,\theta$ shrinks every parameter by the fraction $\eta\lambda$ per step, keeping weights small unless the data need them. It is "decoupled", the W in AdamW: applied directly to $\theta$, not through the gradient, so the division by $\sqrt{s}$ does not weaken it.
 
 ## 3. Autodiff
 
@@ -208,7 +224,22 @@ On u in 2024 (RMSE in m/s), the one number does as well as a separate line for e
 
 **Why the bends.** Without them, lines of lines are one line: $W_2(W_1 x + b_1) + b_2 = (W_2 W_1)\,x + (W_2 b_1 + b_2)$, so the network could do no more than least squares. The bends let it treat a strong wind differently from a weak one, or a westerly differently from an easterly. GELU multiplies $z$ by the share of a standard bell curve that lies below $z$: almost 0 for $z < -2$, almost $z$ for $z > 2$, and smooth in between, so it has a slope everywhere.
 
-**Why rescale the inputs.** Section 1 showed that the largest safe learning rate is set by the steepest curvature, which grows with the size of the inputs ($\overline{x^2}$); section 4 showed the opposite extreme. Rescaling every input to $(x - \bar x)/\sigma_x$, with $\sigma_x$ its standard deviation, makes the inputs alike, so one learning rate suits all weights. `windlab.Standardize` does this inside the model, with the averages of the training data.
+**Why rescale the inputs, and where that stops helping.** Section 1 showed that the largest safe learning rate is set by the steepest curvature, which grows with the size of the inputs ($\overline{x^2}$); section 4 showed the opposite extreme. Rescaling every input to $(x - \bar x)/\sigma_x$, with $\sigma_x$ its standard deviation, removes the differences in size between the inputs, so one learning rate suits them better. `windlab.Standardize` does this inside the model, with the averages of the training data.
+
+It makes the bowl round only for a single input, as in section 1. Our 12 inputs are six hours of u and v, nearly copies of each other, and for correlated inputs the bowl stays long and thin along the directions in which they differ. The curvatures of the loss of a linear model on these inputs:
+
+```python
+def curvature_ratio(X):
+    A = np.c_[X, np.ones(len(X))]  # the inputs, and a column of ones for the bias
+    kappa = np.linalg.eigvalsh(2 * A.T @ A / len(A))  # the curvatures, flattest first
+    return kappa[-1] / kappa[0]
+
+X_train = X_ba[train]
+print(f"steepest / flattest curvature: the line of section 1 {curvature_ratio(x[:, None]):.1f}; 12 inputs, "
+      f"raw {curvature_ratio(X_train):,.0f}, rescaled {curvature_ratio((X_train - X_train.mean(0)) / X_train.std(0)):,.0f}")
+```
+
+The line of section 1 has a ratio of 6.3. The 12 inputs have 1,762 raw and 1,847 rescaled: u and v are both in m/s with similar spreads, so rescaling changes almost nothing here, and the bowl is about 300 times more elongated than the one gradient descent crept along in section 1. Rescaling matters when the inputs come in different units and sizes, a pressure in pascals next to a wind in m/s. To make the bowl of correlated inputs round, they would have to be decorrelated as well ("whitening"), with the matrix of their correlations: second-order information again.
 
 **Why the delta form starts well.** At the start $f(x;\theta) \approx 0$, so $\hat y \approx$ the wind now: training starts from the loss of persistence and only has to learn corrections. With little data, or in a new town, that safe start matters most.
 

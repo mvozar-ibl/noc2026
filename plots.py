@@ -147,7 +147,7 @@ def plot_optimizers(paths, hours_per_step, new_data, loss, best):
     plt.show()
 
 
-def plot_curve_fit(horizons, w_h, path_tau, curve_loss, tau_best, steps=(0, 1, 2, 5, 10, 100)):
+def plot_curve_fit(horizons, w_h, path_tau, curve_loss, steps=(0, 1, 2, 5, 10, 100)):
     """Left: the measured weights and the curve after some steps. Right: the same steps on the loss curve."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4.5))
     ax1.plot(horizons, w_h, "ko", ms=4, label="weight of the best line (least squares)")
@@ -159,7 +159,6 @@ def plot_curve_fit(horizons, w_h, path_tau, curve_loss, tau_best, steps=(0, 1, 2
     taus = np.linspace(1, 60, 300)
     ax2.plot(taus, np.vectorize(curve_loss)(taus), color="lightgrey", lw=2, label="loss L(τ)")
     ax2.plot(path_tau, np.vectorize(curve_loss)(path_tau), "o-", ms=3, label="gradient descent")
-    ax2.plot(tau_best, curve_loss(tau_best), "k*", ms=14, label="best τ (trying every value)")
     ax2.set(xlabel="τ (hours)", ylabel="loss", title="the same steps on the loss curve")
     ax2.legend(fontsize="small")
     plt.show()

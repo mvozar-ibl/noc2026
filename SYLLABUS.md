@@ -18,7 +18,7 @@ After the workshop you can:
 1. download open weather data with one HTTP request, without an account;
 2. build the persistence and climatology baselines, and score a forecast by RMSE and skill;
 3. fit a straight-line forecast ŷ = w·x + b twice, by formula (least squares) and by gradient descent, explain why SGD is needed when the data do not fit in memory and what AdamW adds, and check on new data that they learn the same line;
-4. fit a curve that has no formula, the wind's memory time τ in w(h) = e^(−h/τ), by gradient descent, and check the result two independent ways;
+4. fit a curve that has no formula, the wind's memory time τ in w(h) = e^(−h/τ), by gradient descent, and check its slope against autodiff;
 5. say what autodiff does, and train a small `torch.nn.Module` with the same loop, in the delta form ŷ = wind now + f(x; θ);
 6. read forecasts against the truth to see a model's limits, and test it zero-shot, on a town it never saw in training;
 7. on the fast track: train a small CNN on a 9 × 9 wind field with the same loop, and see why the whole field helps.
@@ -41,7 +41,7 @@ Both tracks start the same way: notebook 1, sections 1–3, in the first 10 minu
 - **Fast track** if almost everyone has run every cell so far without help, and the questions are about the method rather than about Python, numpy or Jupyter.
 - **Standard track** otherwise: if setup problems are still open, if several people are behind, or if the questions are about the code itself.
 
-On the fast track every cell still runs. The time comes from the explanations, which the presenter summarises instead of walking through, and from the two exercises of notebook 1, which move to after the workshop. The table at the top of each notebook gives the minutes of every section for both tracks.
+On the fast track every cell still runs. The time comes from the explanations, which the presenter summarises instead of walking through, and from the two exercises of notebook 1, which move to after the workshop. The minutes of every section, for both tracks, are listed below.
 
 ### Notebook 1: open weather data, and a first forecast (20 min; fast track 15 min)
 
@@ -71,7 +71,7 @@ Minutes: standard / fast track.
 3. A convolutional block; training the CNN and an MLP (4 min)
 4. Forecasts against the truth (4 min)
 
-On the test laptop each notebook runs in under a minute, so the time goes to explanation and experiments. Each notebook section is a few sentences, the key formula, the code and one thing to look for. The derivations and background (least squares, the gradient, the stable learning rate, why SGD, AdamW line by line, autodiff, the memory curve, the network, the normal equations, the convolution) are in `notes/`, for reading at home.
+On the test laptop each notebook runs in under a minute, so the time goes to explanation and experiments. Each notebook section is a few sentences, the key formula, the code and one thing to look for. The derivations and background (the skill score, the autocorrelation and the daily cycle, least squares, the gradient, the stable learning rate, why SGD, AdamW line by line, autodiff, the memory curve, the network, the normal equations, the convolution) are in `notes/`, for reading at home.
 
 ## Setup
 

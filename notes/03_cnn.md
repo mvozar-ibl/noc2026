@@ -27,9 +27,9 @@ A photo is a grid of pixels with three channels, red, green and blue. The wind o
 
 ## 4. Forecasts against the truth
 
-**Why the whole field helps.** Weather systems move with the winds a few kilometres up, typically 30–50 km per hour, so in 6 hours a change travels 200–300 km, about the size of the window. The field therefore holds part of the centre point's future, which no single-point model can see; it is also the only input that makes the forecasts earlier, not just smaller in error (see the notes to notebook 1). Changes that start outside the window remain invisible to every model here. A larger window, or winds from higher levels, would be the next step.
+**Why the whole field helps, and why only a little earlier.** Weather systems move with the winds a few kilometres up, typically 30–50 km per hour, so a change that reaches the centre in 6 hours starts 200–300 km upstream. The window reaches only 74 km to the west and east of the centre, and 111 km to the north and south: it sees what arrives within about 1.5 to 4 hours. The field therefore holds part of the centre point's future, which no single-point model can see, and it is the only input that makes the forecasts earlier, not just smaller in error; but only by about an hour, 5 hours late instead of 6 (see the notes to notebook 1). Changes that start outside the window remain invisible to every model here. A larger window, or winds from higher levels, would be the next step.
 
-**The linear models.** "Linear, whole field" is least squares on all 486 numbers of the three stacked fields, 974 weights and biases, fitted with the same formula as in notebook 2. It already gets most of the gain (skill +0.211). The CNN adds a little on top (+0.220), while the MLP on the flat field does slightly worse than the linear model (+0.205) with 35,458 parameters.
+**The linear models.** "Linear, whole field" is least squares on all 486 numbers of the three stacked fields, 974 weights and biases, fitted with the same formula as in notebook 2. It already gets most of the gain (skill +0.377, against +0.164 for the centre point alone). The CNN adds a little on top (+0.391), while the MLP on the flat field does slightly worse than the linear model (+0.368) with 35,458 parameters.
 
 ## More exercises
 
