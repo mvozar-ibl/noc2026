@@ -24,8 +24,8 @@ Install before the workshop rather than on the venue Wi-Fi: it takes a few minut
 Then:
 
 ```sh
-git clone https://github.com/<org>/noch26-wind.git
-cd noch26-wind
+git clone https://github.com/mvozar-ibl/noc2026.git
+cd noc2026
 uv sync              # Python 3.12 and the locked packages, into .venv
 uv run jupyter lab
 ```
@@ -48,8 +48,8 @@ If PowerShell refuses to run the activate script, run `Set-ExecutionPolicy -Scop
 Colab already has numpy, PyTorch and matplotlib. Open a notebook from GitHub (File → Open notebook → GitHub), then run these two lines in a new first cell, so that `windlab.py`, `plots.py` and `data/` are there:
 
 ```
-!git clone -q https://github.com/<org>/noch26-wind.git
-%cd noch26-wind
+!git clone -q https://github.com/mvozar-ibl/noc2026.git
+%cd noc2026
 ```
 
 Colab's package versions differ from the pinned ones, so some results can differ in the last digits.
@@ -88,4 +88,4 @@ The free Open-Meteo API is for non-commercial use, at under 10,000 calls a day a
 
 ## Licence
 
-Pending: the company decides before publication.
+The code, the notebooks and the notes are under the [MIT licence](LICENSE). The data in `data/` are from Open-Meteo under CC BY 4.0 (see above).
