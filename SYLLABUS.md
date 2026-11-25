@@ -50,8 +50,8 @@ Minutes: standard / fast track.
 1. One request: ERA5 and the open API, speed and direction → u, v (3 / 3 min)
 2. A first look: two weeks of data, the diurnal cycle (2 / 2 min)
 3. The names used in all notebooks (input x, target y, forecast ŷ); two forecasts of the wind speed that need no learning: persistence and climatology; RMSE and skill; splitting by time (5 / 5 min). **Then the presenter chooses the track.**
-4. The best straight line ŷ = w·x + b for the speed, by least squares; the wind's memory; forecasts against the truth (7 / 4 min)
-5. Your turn: two exercises (3 / 1 min; on the fast track the exercises move to after the workshop)
+4. The best straight line ŷ = w·x + b for the speed, by least squares; the wind's memory, the autocorrelation ρ, which sets all three scores; forecasts against the truth (8 / 4 min)
+5. Your turn: two exercises (2 / 1 min; on the fast track the exercises move to after the workshop)
 
 ### Notebook 2: how a model learns, from a straight line to a neural network (20 min; fast track 15 min)
 

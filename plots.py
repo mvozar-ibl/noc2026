@@ -57,6 +57,38 @@ def plot_rmse_by_horizon(horizons, curves, climatology):
     plt.show()
 
 
+def plot_memory_and_score(horizons, rho, curves, climatology, sigma):
+    """Top: the autocorrelation rho against the horizon. Bottom: the measured RMSE of persistence, the best line and
+    climatology (lines) and the same computed from rho alone (dots). A grey line marks where rho drops below 1/2."""
+    cross = horizons[np.argmax(rho < 0.5)]
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 7), sharex=True, height_ratios=[1, 1.5])
+    ax1.plot(horizons, rho, "k", lw=2)
+    ax1.axhline(0.5, color="grey", ls="--", lw=1)
+    ax1.set(ylabel="autocorrelation ρ", ylim=(0, 1.02),
+            title="memory: the correlation of the speed now with the speed h hours later")
+    from_rho = {"persistence": sigma * np.sqrt(2 * (1 - rho)), "best line": sigma * np.sqrt(1 - rho**2)}
+    colours = {"persistence": "C0", "best line": "C2"}
+    dots = dict(ls="", marker="o", ms=6, mfc="white", mew=1.5, markevery=3)
+    for name, curve in curves.items():
+        ax2.plot(horizons, curve, colours[name], lw=2)
+        ax2.plot(horizons, from_rho[name], color=colours[name], **dots)
+        ax2.annotate(name, (horizons[-1], curve[-1]), xytext=(8, -10 if name == "best line" else 0),
+                     textcoords="offset points", va="center")
+    ax2.axhline(climatology, color="C1", lw=2)
+    ax2.plot(horizons, np.full(len(horizons), sigma), color="C1", **dots)
+    ax2.annotate("climatology", (horizons[-1], climatology), xytext=(8, 10), textcoords="offset points", va="center")
+    ax2.plot([], [], "k", lw=2, label="measured on 2024")
+    ax2.plot([], [], color="k", label="computed from ρ alone", **dots)
+    ax2.legend(loc="lower right")
+    ax2.set(xlabel="forecast horizon h (hours)", ylabel="RMSE (m/s)", xlim=(0, horizons[-1] + 10),
+            title="the score: the error of the three forecasts")
+    for ax in (ax1, ax2):
+        ax.axvline(cross, color="grey", lw=1)
+    ax1.annotate(f"ρ < ½ from {cross} h", (cross, 0.5), xytext=(6, 12), textcoords="offset points")
+    fig.tight_layout()
+    plt.show()
+
+
 def plot_best_lines(pairs, best_line, label="speed"):
     """For each horizon h in `pairs` (h -> (x, y)): the data, persistence, climatology and the best line."""
     low = min(min(x.min(), y.min()) for x, y in pairs.values())

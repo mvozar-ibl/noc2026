@@ -110,10 +110,9 @@ Three things follow.
 - *The line never loses to either*: $1 - \rho^2 \le 1$, and $2(1 - \rho) - (1 - \rho^2) = (1 - \rho)^2 \ge 0$. It ties with persistence only at $\rho = 1$ and with climatology only at $\rho = 0$; in between it wins by pulling the forecast towards the average by the factor $\rho$.
 - *Its skill* against persistence is $1 - \frac{1 - \rho^2}{2(1 - \rho)} = \frac{1 - \rho}{2}$, and against climatology $\rho^2$ (Murphy 1988, above).
 
-A check on 2024:
+A check on 2024, with `rho` as measured in the notebook (its figure in section 4 draws the same):
 
 ```python
-rho = np.array([np.corrcoef(speed[test_hours[:-h]], speed[test_hours[:-h] + h])[0, 1] for h in horizons])
 sigma = speed[test_hours].std()
 print(f"rho < 1/2 from {horizons[np.argmax(rho < 0.5)]} h; climatology beats persistence from "
       f"{horizons[np.argmax(rmse_persistence > rmse_climatology)]} h")
