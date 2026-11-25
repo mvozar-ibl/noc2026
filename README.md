@@ -56,17 +56,17 @@ Colab's package versions differ from the pinned ones, so some results can differ
 
 ### Tested
 
-On 4 November 2026, all three notebooks ran without errors and printed the same numbers in each of these setups:
+All three notebooks ran without errors and printed the same numbers in each of these setups, on the date in the last column. After the notebooks were revised, three setups were run again on 25 November 2026: uv on Windows and pip in WSL from a fresh clone, pip on Windows in its existing environment.
 
-| System | Setup | Python |
-| --- | --- | --- |
-| Windows 11 | uv, on a machine without Python 3.12 (uv downloaded it) | 3.12 |
-| Windows 11 | pip | 3.14 |
-| Ubuntu 24.04 in WSL 2 | uv | 3.12 |
-| Ubuntu 24.04 in WSL 2 | pip | 3.12 |
-| Ubuntu 24.04 in WSL 2 | Colab's package versions: torch 2.11, numpy 2.4, matplotlib 3.10 | 3.13 |
+| System | Setup | Python | Last run |
+| --- | --- | --- | --- |
+| Windows 11 | uv, which downloads Python 3.12 itself | 3.12 | 25 November |
+| Windows 11 | pip | 3.14 | 25 November |
+| Ubuntu 24.04 in WSL 2 | uv | 3.12 | 4 November |
+| Ubuntu 24.04 in WSL 2 | pip | 3.12 | 25 November |
+| Ubuntu 24.04 in WSL 2 | Colab's package versions: torch 2.11, numpy 2.4, matplotlib 3.10 | 3.13 | 4 November |
 
-The install took between 10 seconds (uv with a filled cache) and under 3 minutes (pip on Windows).
+The install took between 10 seconds (uv with a filled cache) and under 3 minutes (pip on Windows). On a slow connection it takes much longer, mostly for downloading PyTorch: on 25 November, 3.5 minutes with uv and 25 minutes with pip. Install before the workshop.
 
 ## Files
 
